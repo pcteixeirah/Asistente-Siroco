@@ -9,6 +9,10 @@
   - `get_account_info.py`: Recupera información de la cuenta para verificar la autenticación.
   - `debug_account_info.py`: Inspecciona los métodos del objeto `YTMusic`.
   - `get_playlist.py`: Obtiene y muestra pistas aleatorias de una playlist pública.
+- **playlist/**: Datos de listas de reproducción.
+  - `extract_playlist.py`: Descarga todos los tracks de una playlist y genera dos archivos:
+    - `playlist_<NOMBRE>.json`: Datos crudos de la API.
+    - `siroco_playlist.json`: Datos procesados y limpios para el agente DJ (formato simplificado).
 - **venv/**: Entorno virtual de Python.
 
 ## Configuración de Autenticación
