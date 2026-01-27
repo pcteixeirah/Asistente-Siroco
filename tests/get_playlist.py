@@ -13,8 +13,8 @@ try:
     print("YTMusic initialized successfully.\n")
     
     # 2. Get Playlist Details
-    # Playlist: Salsa de verdad
-    playlist_id = "PLuaL8D_ptxG4k_Rl_bQIvsSkrnu_mnbD5"
+    # Playlist: AZC
+    playlist_id = "PLXlz4-GmC7VsuHrQgBg40CHHqFftdVNqJ"
     
     print(f"Fetching playlist: {playlist_id}...")
     playlist = yt.get_playlist(playlist_id)
