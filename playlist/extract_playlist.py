@@ -29,22 +29,15 @@ try:
     tracks = playlist.get('tracks', [])
     print(f"Found {len(tracks)} tracks in '{playlist_title}'.")
     
-    # 1. Save Raw JSON
-    output_path_raw = path.join(base_dir, output_file)
-    with open(output_path_raw, 'w', encoding='utf-8') as f:
-        json.dump(tracks, f, indent=4, ensure_ascii=False)
-    print(f"Saved raw data to: {output_file}")
-
-    # 2. Process & Clean Data for Siroco
+    # Process & Clean Data for Siroco
     siroco_tracks = []
     for track in tracks:
         # Extract artist names
         artists_list = track.get('artists', [])
-        if artists_list is None: # Handle edge case where artists might be None
+        if artists_list is None: 
              artist_names = []
         else:
              artist_names = [a.get('name') for a in artists_list if isinstance(a, dict) and 'name' in a]
-
 
         # Safe extraction of album
         album_data = track.get('album')
@@ -56,6 +49,7 @@ try:
             "artists": artist_names,
             "album": album_name,
             "duration": track.get('duration_seconds'),
+            "filepath": None,  # Placeholder for downloaded file
             "analysis": {
                 "bpm": None,
                 "key": None,
@@ -66,7 +60,7 @@ try:
         }
         siroco_tracks.append(clean_track)
 
-    # 3. Save Cleaned JSON
+    # Save Cleaned JSON
     output_file_clean = "siroco_playlist.json"
     output_path_clean = path.join(base_dir, output_file_clean)
     
