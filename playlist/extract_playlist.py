@@ -49,7 +49,6 @@ try:
             "artists": artist_names,
             "album": album_name,
             "duration": track.get('duration_seconds'),
-            "filepath": None,  # Placeholder for downloaded file
             "analysis": {
                 "bpm": None,
                 "key": None,
