@@ -18,8 +18,9 @@ def setup_environment():
         os.environ["PATH"] += os.pathsep + winget_path
 
 def sanitize_filename(name):
-    """Remove filesystem-unsafe characters."""
-    return re.sub(r'[<>:"/\\|?*]', '', name).strip()
+    """Remove filesystem-unsafe characters and replace spaces with underscores."""
+    name = re.sub(r'[<>:"/\\|?*]', '', name).strip()
+    return re.sub(r'\s+', '_', name)
 
 def download_tracks():
     base_dir = path.dirname(__file__)
@@ -51,6 +52,11 @@ def download_tracks():
         }],
         'quiet': True,
         'no_warnings': True,
+        # Anti-Bot Measures
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'sleep_interval': 3, # Sleep between internal requests
+        'max_sleep_interval': 8,
+        'nocheckcertificate': True,
     }
 
     setup_environment()
@@ -85,17 +91,20 @@ def download_tracks():
             print(f"Attempting: {clean_name} ({video_id})...")
             url = f"https://www.youtube.com/watch?v={video_id}"
             
+            # Explicit wait before request
+            time.sleep(random.uniform(5.0, 10.0))
+            
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
             
             print(f" -> Success!")
             success_count += 1
             
-        except Exception:
+        except Exception as e:
             # Catch 403 or other errors
-            print(f" -> Failed (Skipping to next track)")
-            # Wait a bit to avoid aggressive rate limiting
-            time.sleep(random.uniform(1.5, 3.5))
+            print(f" -> Failed: {e} (Skipping to next track)")
+            # Longer wait on failure
+            time.sleep(random.uniform(10.0, 15.0))
 
     if success_count < TARGET_SUCCESS:
         print(f"Finished. Could only download {success_count} tracks (ran out of candidates).")
