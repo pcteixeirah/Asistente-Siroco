@@ -2,6 +2,7 @@ from ytmusicapi import YTMusic
 from os import path
 import json
 import re
+import random
 
 # Configuration
 PLAYLIST_ID = "PLXlz4-GmC7VsuHrQgBg40CHHqFftdVNqJ"
@@ -43,19 +44,25 @@ try:
         album_data = track.get('album')
         album_name = album_data.get('name') if isinstance(album_data, dict) else None
 
+        # Mock/Enriched Data
         clean_track = {
             "videoId": track.get('videoId'),
             "title": track.get('title'),
             "artists": artist_names,
             "album": album_name,
             "duration": track.get('duration_seconds'),
+            "playlist": playlist_title,
+            "popularity": random.randint(0, 100), # Mock: 0-100
+            "demographic": random.choice(['Family', 'Couple', 'Social']), # Mock
+            "energy": random.randint(1, 10), # Mock: 1-10
+            "tags": [], # Placeholder: ytmusicapi playlist tracks rarely have categories
             "analysis": {
                 "bpm": None,
                 "key": None,
                 "energy": None,
                 "danceability": None
             },
-            "tags": []
+            "tags": [] 
         }
         siroco_tracks.append(clean_track)
 
