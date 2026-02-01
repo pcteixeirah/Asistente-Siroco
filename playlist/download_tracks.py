@@ -8,7 +8,7 @@ from os import path
 
 # Configurations
 PLAYLIST_JSON = "siroco_playlist.json"
-DOWNLOAD_DIR = "samples"
+DOWNLOAD_DIR = "assets"
 TARGET_SUCCESS = 5
 
 def setup_environment():
