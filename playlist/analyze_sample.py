@@ -6,7 +6,8 @@ from tqdm import tqdm
 
 # --- Configuración ---
 ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
-OUTPUT_CSV = os.path.join(ASSETS_DIR, "audio_analysis.csv")
+PLAYLIST_DIR = os.path.dirname(__file__)
+OUTPUT_CSV = os.path.join(PLAYLIST_DIR, "audio_analysis.csv")
 SAMPLE_RATE = 22050
 DURATION = 60 # Analizar solo los primeros 60 segundos para velocidad
 
@@ -75,10 +76,17 @@ def analyze_track(filepath):
         # Duración Total (estimada del archivo completo, no del crop)
         total_duration = librosa.get_duration(path=filepath)
         
+        # Energía (RMS)
+        rms = librosa.feature.rms(y=y)
+        rms_mean = np.mean(rms)
+        # Escalar a 1-10: RMS típico es ~0.01 a 0.1+. x100 nos da 1-10+.
+        energy_score = int(min(max(rms_mean * 100, 1), 10))
+
         return {
             "filename": os.path.basename(filepath),
             "bpm_estimated": int(round(tempo)) if isinstance(tempo, float) else int(round(tempo[0])),
             "key_estimated": key,
+            "energy_rms": energy_score,
             "duration_sec": round(total_duration, 2),
             "status": "success"
         }
@@ -87,6 +95,7 @@ def analyze_track(filepath):
             "filename": os.path.basename(filepath),
             "bpm_estimated": None,
             "key_estimated": None,
+            "energy_rms": None,
             "duration_sec": None,
             "status": f"error: {str(e)}"
         }
