@@ -1,5 +1,86 @@
 [
     {
+        "videoId": "p1g0qoJWUgU",
+        "title": "Dreamer",
+        "artists": [
+            "Ozzy Osbourne"
+        ],
+        "album": "Down To Earth",
+        "duration": 285,
+        "playlist": "AZC",
+        "popularity": null,
+        "demographic": null,
+        "energy": null,
+        "tags": [],
+        "analysis": {
+            "bpm": null,
+            "key": null,
+            "energy": null,
+            "danceability": null
+        }
+    },
+    {
+        "videoId": "l1kto9lKh6U",
+        "title": "Cry Baby",
+        "artists": [
+            "Afu-Ra Featuring Lady Blue & Q"
+        ],
+        "album": "State Of The Arts",
+        "duration": 272,
+        "playlist": "AZC",
+        "popularity": null,
+        "demographic": null,
+        "energy": null,
+        "tags": [],
+        "analysis": {
+            "bpm": null,
+            "key": null,
+            "energy": null,
+            "danceability": null
+        }
+    },
+    {
+        "videoId": "9QrOE37zALY",
+        "title": "Normal - Alcolirykoz (LETRA)",
+        "artists": [
+            "Latin Rap"
+        ],
+        "album": null,
+        "duration": 203,
+        "playlist": "AZC",
+        "popularity": null,
+        "demographic": null,
+        "energy": null,
+        "tags": [],
+        "analysis": {
+            "bpm": null,
+            "key": null,
+            "energy": null,
+            "danceability": null
+        }
+    },
+    {
+        "videoId": "0cFBwDXsKMY",
+        "title": "Bombacid",
+        "artists": [
+            "T78",
+            "Roberto Molinaro"
+        ],
+        "album": "Bombacid",
+        "duration": 204,
+        "playlist": "AZC",
+        "popularity": null,
+        "demographic": null,
+        "energy": null,
+        "tags": [],
+        "analysis": {
+            "bpm": null,
+            "key": null,
+            "energy": null,
+            "danceability": null
+        }
+    },
+    {
         "videoId": "JGwWNGJdvx8",
         "title": "Shape of You",
         "artists": [
@@ -1890,17 +1971,18 @@
         }
     },
     {
-        "videoId": "4BVNSinxC30",
-        "title": "Medellificación (feat. Jeronimo)",
+        "videoId": "TyMtU9fYbZo",
+        "title": "Medellificación",
         "artists": [
-            "Alcolirykoz"
+            "Alcolirykoz",
+            "Jeronimo"
         ],
         "album": "Medellificación",
         "duration": 232,
         "playlist": "AZC",
-        "popularity": 92,
-        "demographic": "Couple",
-        "energy": 5,
+        "popularity": null,
+        "demographic": null,
+        "energy": null,
         "tags": [],
         "analysis": {
             "bpm": null,
@@ -2349,9 +2431,9 @@
         "album": "Dusty... Definitely (Expanded Edtion)",
         "duration": 165,
         "playlist": "AZC",
-        "popularity": 79,
+        "popularity": 2,
         "demographic": "Couple",
-        "energy": 7,
+        "energy": 6,
         "tags": [],
         "analysis": {
             "bpm": null,
@@ -3186,17 +3268,17 @@
         }
     },
     {
-        "videoId": "bi2xxL2T3hQ",
+        "videoId": "TrJ8uWsgWUk",
         "title": "Nada",
         "artists": [
             "Penyair"
         ],
-        "album": "La Ley del Todo",
-        "duration": 222,
+        "album": "La Ley Del Todo",
+        "duration": 223,
         "playlist": "AZC",
-        "popularity": 85,
-        "demographic": "Couple",
-        "energy": 2,
+        "popularity": null,
+        "demographic": null,
+        "energy": null,
         "tags": [],
         "analysis": {
             "bpm": null,
@@ -4792,9 +4874,9 @@
     },
     {
         "videoId": "Ywq6FMLbWH4",
-        "title": "Hippie Sabotage - Devil Eyes",
+        "title": "Devil Eyes",
         "artists": [
-            "Scooby"
+            "Hippie Sabotage"
         ],
         "album": null,
         "duration": 232,
@@ -5103,26 +5185,6 @@
         "popularity": 66,
         "demographic": "Family",
         "energy": 7,
-        "tags": [],
-        "analysis": {
-            "bpm": null,
-            "key": null,
-            "energy": null,
-            "danceability": null
-        }
-    },
-    {
-        "videoId": null,
-        "title": "Queen Jailhouse Rock (Live Rock Montreal HD)",
-        "artists": [
-            "mario98gta"
-        ],
-        "album": null,
-        "duration": 168,
-        "playlist": "AZC",
-        "popularity": 79,
-        "demographic": "Social",
-        "energy": 8,
         "tags": [],
         "analysis": {
             "bpm": null,
@@ -6235,26 +6297,6 @@
         }
     },
     {
-        "videoId": null,
-        "title": "Flor Amargo \"Tu y yo\" para piano y voz",
-        "artists": [
-            "Flor Amargo"
-        ],
-        "album": null,
-        "duration": 150,
-        "playlist": "AZC",
-        "popularity": 51,
-        "demographic": "Family",
-        "energy": 5,
-        "tags": [],
-        "analysis": {
-            "bpm": null,
-            "key": null,
-            "energy": null,
-            "danceability": null
-        }
-    },
-    {
         "videoId": "djV11Xbc914",
         "title": "Take On Me",
         "artists": [
@@ -6727,26 +6769,6 @@
         "popularity": 47,
         "demographic": "Social",
         "energy": 3,
-        "tags": [],
-        "analysis": {
-            "bpm": null,
-            "key": null,
-            "energy": null,
-            "danceability": null
-        }
-    },
-    {
-        "videoId": null,
-        "title": "Madame X",
-        "artists": [
-            "Rata Blanca"
-        ],
-        "album": "Rata Blanca",
-        "duration": 250,
-        "playlist": "AZC",
-        "popularity": 42,
-        "demographic": "Couple",
-        "energy": 8,
         "tags": [],
         "analysis": {
             "bpm": null,
@@ -7247,26 +7269,6 @@
         "popularity": 56,
         "demographic": "Social",
         "energy": 10,
-        "tags": [],
-        "analysis": {
-            "bpm": null,
-            "key": null,
-            "energy": null,
-            "danceability": null
-        }
-    },
-    {
-        "videoId": null,
-        "title": "KRAKEN - Vestido De Cristal",
-        "artists": [
-            "EVIL69X"
-        ],
-        "album": null,
-        "duration": 297,
-        "playlist": "AZC",
-        "popularity": 43,
-        "demographic": "Family",
-        "energy": 4,
         "tags": [],
         "analysis": {
             "bpm": null,
@@ -8459,7 +8461,7 @@
     },
     {
         "videoId": "nhPaWIeULKk",
-        "title": "Stylo (feat. Bobby Womack & Mos Def)",
+        "title": "Stylo (feat. Mos Def & Bobby Womack)",
         "artists": [
             "Gorillaz"
         ],
@@ -8949,26 +8951,6 @@
         "popularity": 90,
         "demographic": "Social",
         "energy": 2,
-        "tags": [],
-        "analysis": {
-            "bpm": null,
-            "key": null,
-            "energy": null,
-            "danceability": null
-        }
-    },
-    {
-        "videoId": null,
-        "title": "Julio Jaramillo - Ódiame",
-        "artists": [
-            "Isaac Velazquez"
-        ],
-        "album": null,
-        "duration": 169,
-        "playlist": "AZC",
-        "popularity": 59,
-        "demographic": "Family",
-        "energy": 10,
         "tags": [],
         "analysis": {
             "bpm": null,
@@ -10539,7 +10521,7 @@
     },
     {
         "videoId": "fJ9rUzIMcZQ",
-        "title": "Bohemian Rhapsody",
+        "title": "Bohemian Rhapsody (Live At Wembley Stadium / July 1986)",
         "artists": [
             "Queen"
         ],
@@ -11319,7 +11301,7 @@
     },
     {
         "videoId": "ZkW-K5RQdzo",
-        "title": "Feuer Frei",
+        "title": "Feuer frei! (Single Version)",
         "artists": [
             "Rammstein"
         ],
@@ -12620,7 +12602,7 @@
     },
     {
         "videoId": "DAIxrSvq6bo",
-        "title": "Nek - Laura no està (Official Video)",
+        "title": "Laura No Está",
         "artists": [
             "Nek"
         ],
