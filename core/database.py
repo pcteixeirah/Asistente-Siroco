@@ -72,9 +72,35 @@ class SirocoRegistry:
             logger.error(f"Error checking registry for {yt_id}: {e}")
             return False
 
+    def get_all_tracks(self):
+        """
+        Returns a list of all tracks as dictionaries.
+        """
+        try:
+            with self._get_connection() as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM tracks")
+                rows = cursor.fetchall()
+                result = []
+                for row in rows:
+                    data = dict(row)
+                    # Parse JSON fields
+                    for field in ['artist', 'tags', 'file_path_metadata']:
+                        if data.get(field):
+                            try:
+                                data[field] = json.loads(data[field])
+                            except:
+                                pass
+                    result.append(data)
+                return result
+        except Exception as e:
+            logger.error(f"Error getting all tracks: {e}")
+            return []
+
     def add_track_metadata(self, yt_id, title, artist_list, album, playlist, popularity=None, demographic=None, tags=None, genre=None):
         """
-        Initial insert of metadata. Status -> pending.
+        Initial insert of metadata. Uses INSERT OR IGNORE to avoid wiping existing analysis.
         """
         try:
             artist_json = json.dumps(artist_list) if artist_list else "[]"
@@ -82,9 +108,10 @@ class SirocoRegistry:
             
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                # Use INSERT OR REPLACE to update metadata if it changes in JSON
+                # Changed to INSERT OR IGNORE to preserve existing analysis data (BPM, Key, etc.)
+                # This ensures DB acts as a persistent non-destructive source of truth
                 cursor.execute("""
-                    INSERT OR REPLACE INTO tracks (
+                    INSERT OR IGNORE INTO tracks (
                         yt_id, title, artist, album, playlist, genre, 
                         popularity, demographic, tags, 
                         status, last_analyzed

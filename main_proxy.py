@@ -41,15 +41,15 @@ def main():
         logger.critical(f"Failed to initialize modules: {e}")
         return
 
-    # 1. Sync Playlist (Source of Truth)
-    logger.info("Step 1: Syncing Playlist (Live -> Local JSON)...")
-    tracks = scanner.sync_playlist()
+    # 1. Sync Playlist (Source of Truth is now DB)
+    logger.info("Step 1: Syncing Playlist (Live -> DB)...")
+    tracks = scanner.sync_playlist(db)
     
     if not tracks:
         logger.error("No tracks found or sync failed. Exiting.")
         return
 
-    logger.info(f"Sync complete. Local JSON contains {len(tracks)} tracks.")
+    logger.info(f"Sync complete. DB contains {len(tracks)} tracks.")
 
     # 2. Process Tracks
     logger.info("Step 2: Processing Tracks (Download -> Analyze -> Store)...")
@@ -57,36 +57,33 @@ def main():
     processed_count = 0
 
     for i, track in enumerate(tracks):
-        yt_id = track.get('videoId')
+        yt_id = track.get('yt_id')
         title = track.get('title')
-        artists = track.get('artists', [])
+        artists = track.get('artist', []) # Note: DB column is 'artist', stores JSON list
         album = track.get('album')
         playlist_name = track.get('playlist')
         
-        # Extended Metadata
+        # Extended Metadata (preserved in DB if present)
         popularity = track.get('popularity')
         demographic = track.get('demographic')
         tags = track.get('tags', [])
+        
+        status = track.get('status')
 
         if not yt_id:
             continue
 
-        # Check Registry
-        cached_data = db.check_registry(yt_id)
-        if cached_data:
-             if cached_data['status'] == 'success':
-                 logger.info(f"[{i+1}/{len(tracks)}] Skipping '{title}' (Already analyzed). BPM: {cached_data['bpm']}")
-                 continue
-             elif cached_data['status'] == 'failed':
-                 logger.info(f"[{i+1}/{len(tracks)}] Re-trying failed track: '{title}'")
+        # Check Status directly from DB track record
+        if status == 'success':
+            bpm = track.get('bpm')
+            logger.info(f"[{i+1}/{len(tracks)}] Skipping '{title}' (Already analyzed). BPM: {bpm}")
+            continue
+        elif status == 'failed':
+            logger.info(f"[{i+1}/{len(tracks)}] Re-trying failed track: '{title}'")
         
         logger.info(f"[{i+1}/{len(tracks)}] Processing: {title}...")
 
-        # Update Metadata in DB (even if we fail analysis later, we want metadata stored)
-        db.add_track_metadata(
-            yt_id, title, artists, album, playlist_name, 
-            popularity, demographic, tags
-        )
+        # Note: robust metadata update is handled by sync_playlist, so we don't call add_track_metadata here.
 
         # Download & Analyze
         try:
