@@ -1,8 +1,10 @@
 
 import sqlite3
 import os
+from core.config import load_config
 
-db_path = 'data/siroco_registry.db'
+config = load_config()
+db_path = config["paths"]["database"]
 
 if not os.path.exists(db_path):
     print(f"Error: Database file not found at {db_path}")

@@ -1,0 +1,24 @@
+# ============================================
+# SIROCO - Configuración Central del Proxy
+# ============================================
+
+paths:
+  database: "data/siroco_registry.db"
+  temp_cache: "data/temp_cache"
+  log_file: "logs/process.log"
+  auth_config: "setup/headers_auth.cfg"
+
+playlist:
+  default_id: "PLXlz4-GmC7VsuHrQgBg40CHHqFftdVNqJ"
+
+proxy:
+  batch_size: 5
+  batch_delay_min: 2
+  batch_delay_max: 5
+  max_retries: 3
+
+downloader:
+  format: "bestaudio[abr<=64]/worst"
+
+analyzer:
+  sample_rate: 22050

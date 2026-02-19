@@ -4,42 +4,61 @@ import time
 import random
 import logging
 import argparse
+from core.config import load_config
+from core.errors import classify_error
 from core.database import SirocoRegistry
 from core.downloader import LowFiDownloader
 from core.analyzer import AudioAnalyzer
 from core.scanner import PlaylistScanner
 
-# Setup Logging
-os.makedirs("logs", exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("logs/process.log", encoding='utf-8', mode='w'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
-
-# Constants
-PLAYLIST_ID_DEFAULT = "PLXlz4-GmC7VsuHrQgBg40CHHqFftdVNqJ"
-
 def main():
+    # Load centralized config
+    config = load_config()
+
+    # Setup Logging
+    log_dir = os.path.dirname(config["paths"]["log_file"])
+    os.makedirs(log_dir, exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(config["paths"]["log_file"], encoding='utf-8', mode='w'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    logger = logging.getLogger(__name__)
+
     parser = argparse.ArgumentParser(description="Siroco Musical Analysis Proxy")
-    parser.add_argument("--playlist", type=str, default=PLAYLIST_ID_DEFAULT, help="YouTube Playlist ID")
+    parser.add_argument(
+        "--playlist", type=str,
+        default=config["playlist"]["default_id"],
+        help="YouTube Playlist ID"
+    )
     args = parser.parse_args()
 
     logger.info(f"Starting Proxy Workflow for Playlist ID: {args.playlist}")
 
-    # Initialize Modules
+    # Initialize Modules (all receive config values)
     try:
-        db = SirocoRegistry()
-        downloader = LowFiDownloader()
-        analyzer = AudioAnalyzer()
-        scanner = PlaylistScanner(playlist_id=args.playlist)
+        db = SirocoRegistry(db_path=config["paths"]["database"])
+        downloader = LowFiDownloader(
+            download_path=config["paths"]["temp_cache"],
+            audio_format=config["downloader"]["format"]
+        )
+        analyzer = AudioAnalyzer(sample_rate=config["analyzer"]["sample_rate"])
+        scanner = PlaylistScanner(
+            playlist_id=args.playlist,
+            auth_path=config["paths"]["auth_config"]
+        )
     except Exception as e:
         logger.critical(f"Failed to initialize modules: {e}")
         return
+
+    # Proxy config
+    BATCH_SIZE = config["proxy"]["batch_size"]
+    DELAY_MIN = config["proxy"]["batch_delay_min"]
+    DELAY_MAX = config["proxy"]["batch_delay_max"]
+    MAX_RETRIES = config["proxy"]["max_retries"]
 
     # 1. Sync Playlist (Source of Truth is now DB)
     logger.info("Step 1: Syncing Playlist (Live -> DB)...")
@@ -53,37 +72,37 @@ def main():
 
     # 2. Process Tracks
     logger.info("Step 2: Processing Tracks (Download -> Analyze -> Store)...")
-    BATCH_SIZE = 5
     processed_count = 0
 
     for i, track in enumerate(tracks):
         yt_id = track.get('yt_id')
         title = track.get('title')
-        artists = track.get('artist', []) # Note: DB column is 'artist', stores JSON list
-        album = track.get('album')
-        playlist_name = track.get('playlist')
-        
-        # Extended Metadata (preserved in DB if present)
-        popularity = track.get('popularity')
-        demographic = track.get('demographic')
-        tags = track.get('tags', [])
-        
         status = track.get('status')
+        error_type = track.get('error_type')
+        retry_count = track.get('retry_count') or 0
 
         if not yt_id:
             continue
 
-        # Check Status directly from DB track record
+        # Skip permanently failed tracks
+        if status == 'failed' and error_type == 'permanent':
+            logger.info(f"[{i+1}/{len(tracks)}] Skipping '{title}' (Permanent failure: {error_type})")
+            continue
+
+        # Skip tracks that exceeded max retries
+        if status == 'failed' and retry_count >= MAX_RETRIES:
+            logger.info(f"[{i+1}/{len(tracks)}] Skipping '{title}' (Max retries reached: {retry_count})")
+            continue
+
+        # Skip already analyzed tracks
         if status == 'success':
             bpm = track.get('bpm')
             logger.info(f"[{i+1}/{len(tracks)}] Skipping '{title}' (Already analyzed). BPM: {bpm}")
             continue
         elif status == 'failed':
-            logger.info(f"[{i+1}/{len(tracks)}] Re-trying failed track: '{title}'")
+            logger.info(f"[{i+1}/{len(tracks)}] Re-trying failed track: '{title}' (retry {retry_count + 1}/{MAX_RETRIES})")
         
         logger.info(f"[{i+1}/{len(tracks)}] Processing: {title}...")
-
-        # Note: robust metadata update is handled by sync_playlist, so we don't call add_track_metadata here.
 
         # Download & Analyze
         try:
@@ -93,7 +112,7 @@ def main():
             
             # Analyze
             logger.info("  -> Analyzing...")
-            algo_res = analyzer.analyze_track(audio_path) # Returns dict of features
+            algo_res = analyzer.analyze_track(audio_path)
             
             # Update DB with Analysis
             db.update_analysis(
@@ -107,12 +126,13 @@ def main():
             processed_count += 1
 
         except Exception as e:
-            logger.error(f"  -> Failed: {e}")
-            db.mark_failed(yt_id)
+            err_type = classify_error(e)
+            logger.error(f"  -> Failed ({err_type}): {e}")
+            db.mark_failed(yt_id, error_type=err_type)
         
         # Batch Delay to avoid rate limiting
         if processed_count > 0 and processed_count % BATCH_SIZE == 0:
-             wait_time = random.randint(2, 5)
+             wait_time = random.randint(DELAY_MIN, DELAY_MAX)
              logger.info(f"Batch limit reached. Sleeping {wait_time}s...")
              time.sleep(wait_time)
 

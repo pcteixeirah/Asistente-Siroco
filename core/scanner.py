@@ -10,15 +10,12 @@ import os
 logger = logging.getLogger(__name__)
 
 class PlaylistScanner:
-    def __init__(self, playlist_id="PLXlz4-GmC7VsuHrQgBg40CHHqFftdVNqJ"):
+    def __init__(self, playlist_id, auth_path=None):
         self.playlist_id = playlist_id
-        self.base_dir = path.dirname(__file__)
-        self.root_dir = path.join(self.base_dir, '..')
-        self.auth_path = path.join(self.root_dir, 'setup', 'headers_auth.cfg')
-        
+
         # Initialize YTMusic
-        if path.exists(self.auth_path):
-            self.yt = YTMusic(self.auth_path)
+        if auth_path and path.exists(auth_path):
+            self.yt = YTMusic(auth_path)
             logger.info("Authenticated YTMusic user.")
         else:
             self.yt = YTMusic()

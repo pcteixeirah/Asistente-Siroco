@@ -6,12 +6,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Constants
-SAMPLE_RATE = 22050
 MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
 MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
 NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
 class AudioAnalyzer:
+    def __init__(self, sample_rate=22050):
+        self.sample_rate = sample_rate
     def _estimate_key(self, y, sr):
         """
         Estimates Key using Krumhansl-Schmuckler algorithm (simplified).
@@ -47,7 +48,7 @@ class AudioAnalyzer:
         """
         try:
             # Load with low SR and Mono
-            y, sr = librosa.load(filepath, sr=SAMPLE_RATE, mono=True)
+            y, sr = librosa.load(filepath, sr=self.sample_rate, mono=True)
             
             # BPM
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr)

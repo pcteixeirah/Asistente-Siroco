@@ -5,8 +5,9 @@ import yt_dlp
 logger = logging.getLogger(__name__)
 
 class LowFiDownloader:
-    def __init__(self, download_path="data/temp_cache"):
+    def __init__(self, download_path, audio_format="bestaudio[abr<=64]/worst"):
         self.download_path = download_path
+        self.audio_format = audio_format
         os.makedirs(self.download_path, exist_ok=True)
     
     def download_audio(self, yt_id):
@@ -17,13 +18,12 @@ class LowFiDownloader:
         url = f"https://www.youtube.com/watch?v={yt_id}"
         
         ydl_opts = {
-            'format': 'bestaudio[abr<=64]/worst', # Low bitrate preference
+            'format': self.audio_format,
             'outtmpl': os.path.join(self.download_path, '%(id)s.%(ext)s'),
-            'postprocessors': [], # No post-processing (keep original container for speed)
+            'postprocessors': [],  # No post-processing (keep original container for speed)
             'quiet': True,
             'no_warnings': True,
             'overwrites': True,
-            # 'logger': logger # Can bind logger if needed, but might be noisy
         }
 
         try:

@@ -7,10 +7,11 @@ import os
 logger = logging.getLogger(__name__)
 
 class SirocoRegistry:
-    def __init__(self, db_path="data/siroco_registry.db"):
+    def __init__(self, db_path):
         self.db_path = db_path
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._create_table()
+        self._migrate()
 
     def _get_connection(self):
         return sqlite3.connect(self.db_path)
@@ -35,10 +36,32 @@ class SirocoRegistry:
                     duration REAL,
                     last_analyzed TIMESTAMP,
                     status TEXT DEFAULT 'pending',
-                    file_path_metadata TEXT
+                    file_path_metadata TEXT,
+                    error_type TEXT,
+                    retry_count INTEGER DEFAULT 0
                 )
             """)
             conn.commit()
+
+    def _migrate(self):
+        """Add new columns to existing databases without losing data."""
+        migrations = [
+            ("error_type", "TEXT"),
+            ("retry_count", "INTEGER DEFAULT 0"),
+        ]
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA table_info(tracks)")
+                existing_cols = {row[1] for row in cursor.fetchall()}
+
+                for col_name, col_type in migrations:
+                    if col_name not in existing_cols:
+                        cursor.execute(f"ALTER TABLE tracks ADD COLUMN {col_name} {col_type}")
+                        logger.info(f"Migrated: added column '{col_name}' to tracks table.")
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Migration error: {e}")
 
     def check_registry(self, yt_id):
         """
@@ -108,8 +131,7 @@ class SirocoRegistry:
             
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                # Changed to INSERT OR IGNORE to preserve existing analysis data (BPM, Key, etc.)
-                # This ensures DB acts as a persistent non-destructive source of truth
+                # INSERT OR IGNORE preserves existing analysis data (BPM, Key, etc.)
                 cursor.execute("""
                     INSERT OR IGNORE INTO tracks (
                         yt_id, title, artist, album, playlist, genre, 
@@ -127,14 +149,16 @@ class SirocoRegistry:
 
     def update_analysis(self, yt_id, bpm, key, energy, duration):
         """
-        Update with analysis results. Status -> success.
+        Update with analysis results. Status -> success. Resets error fields.
         """
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     UPDATE tracks 
-                    SET bpm = ?, key = ?, energy_rms = ?, duration = ?, status = 'success', last_analyzed = ?
+                    SET bpm = ?, key = ?, energy_rms = ?, duration = ?, 
+                        status = 'success', last_analyzed = ?,
+                        error_type = NULL, retry_count = 0
                     WHERE yt_id = ?
                 """, (bpm, key, energy, duration, datetime.now(), yt_id))
                 conn.commit()
@@ -143,12 +167,20 @@ class SirocoRegistry:
             logger.error(f"Error updating analysis for {yt_id}: {e}")
             return False
 
-    def mark_failed(self, yt_id):
+    def mark_failed(self, yt_id, error_type="unknown"):
+        """
+        Mark track as failed with error classification.
+        Increments retry_count for tracking purposes.
+        """
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("UPDATE tracks SET status = 'failed', last_analyzed = ? WHERE yt_id = ?", 
-                               (datetime.now(), yt_id))
+                cursor.execute("""
+                    UPDATE tracks 
+                    SET status = 'failed', last_analyzed = ?, 
+                        error_type = ?, retry_count = COALESCE(retry_count, 0) + 1
+                    WHERE yt_id = ?
+                """, (datetime.now(), error_type, yt_id))
                 conn.commit()
         except Exception as e:
             logger.error(f"Error marking failure for {yt_id}: {e}")
