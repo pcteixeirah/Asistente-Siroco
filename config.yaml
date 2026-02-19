@@ -15,10 +15,20 @@ proxy:
   batch_size: 5
   batch_delay_min: 2
   batch_delay_max: 5
-  max_retries: 3
+  max_retries: 1
 
 downloader:
   format: "bestaudio[abr<=64]/worst"
 
 analyzer:
   sample_rate: 22050
+
+# --- Proxy & Auth ---
+proxy_rotation:
+  mode: "gateway" # "gateway" | "none"
+  # Replace with actual BrightData/DataImpulse URL
+  gateway_url: "https://geo.brdtest.com/welcome.txt?product=resi&method=native" 
+
+paths:
+  # ... existing paths are merged below by config loader, but we can override here
+  cookies: "setup/cookies.txt"

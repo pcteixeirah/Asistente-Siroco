@@ -8,6 +8,7 @@ from core.config import load_config
 from core.errors import classify_error
 from core.database import SirocoRegistry
 from core.downloader import LowFiDownloader
+from core.proxy_pool import ProxyPool
 from core.analyzer import AudioAnalyzer
 from core.scanner import PlaylistScanner
 
@@ -40,10 +41,14 @@ def main():
 
     # Initialize Modules (all receive config values)
     try:
+        proxy_pool = ProxyPool(config.get("proxy_rotation", {}))
+        
         db = SirocoRegistry(db_path=config["paths"]["database"])
         downloader = LowFiDownloader(
             download_path=config["paths"]["temp_cache"],
-            audio_format=config["downloader"]["format"]
+            audio_format=config["downloader"]["format"],
+            proxy_pool=proxy_pool,
+            cookies_path=config["paths"].get("cookies")
         )
         analyzer = AudioAnalyzer(sample_rate=config["analyzer"]["sample_rate"])
         scanner = PlaylistScanner(
@@ -127,6 +132,10 @@ def main():
 
         except Exception as e:
             err_type = classify_error(e)
+            if err_type == "transient":
+                proxy_pool.rotate()
+                logger.info(f"  -> Rotated proxy (Active: {proxy_pool.get_proxy()})")
+            
             logger.error(f"  -> Failed ({err_type}): {e}")
             db.mark_failed(yt_id, error_type=err_type)
         

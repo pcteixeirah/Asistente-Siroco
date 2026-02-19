@@ -19,13 +19,13 @@ _PERMANENT_PATTERNS = [
     r"members.only",
     r"premiere",              # upcoming premiere, not yet available
     r"join this channel",     # members-only content
-    r"HTTP Error 403",        # Forbidden
     r"HTTP Error 404",        # Not found
     r"HTTP Error 410",        # Gone (permanently removed)
 ]
 
 # Patterns that indicate TRANSIENT failures (safe to retry)
 _TRANSIENT_PATTERNS = [
+    r"HTTP Error 403",        # Forbidden (IP ban — rotatable)
     r"HTTP Error 429",        # Too Many Requests
     r"HTTP Error 5\d{2}",     # 500, 502, 503, etc.
     r"timed?\s*out",          # timeout / timed out
