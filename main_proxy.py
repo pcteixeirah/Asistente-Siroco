@@ -64,6 +64,7 @@ def main():
     DELAY_MIN = config["proxy"]["batch_delay_min"]
     DELAY_MAX = config["proxy"]["batch_delay_max"]
     MAX_RETRIES = config["proxy"]["max_retries"]
+    MAX_TRACKS = config["proxy"].get("max_tracks_to_process", 0)
 
     # 1. Sync Playlist (Source of Truth is now DB)
     logger.info("Step 1: Syncing Playlist (Live -> DB)...")
@@ -107,6 +108,11 @@ def main():
         elif status == 'failed':
             logger.info(f"[{i+1}/{len(tracks)}] Re-trying failed track: '{title}' (retry {retry_count + 1}/{MAX_RETRIES})")
         
+        # Check execution limit before processing
+        if MAX_TRACKS > 0 and processed_count >= MAX_TRACKS:
+            logger.info(f"🛑 Reached execution limit of {MAX_TRACKS} tracks. Stopping batch processing.")
+            break
+
         logger.info(f"[{i+1}/{len(tracks)}] Processing: {title}...")
 
         # Download & Analyze
