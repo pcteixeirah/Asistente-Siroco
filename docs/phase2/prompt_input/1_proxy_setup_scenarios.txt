@@ -1,0 +1,22 @@
+The issue is likely one of these:
+
+1. Wrong protocol in your tool
+
+Use HTTP proxy (or HTTPS proxy) with host brd.superproxy.io and port 33335.
+Do not use SOCKS5 on 33335 (SOCKS5 uses a different port: see SOCKS5 docs).
+
+2. SSL / certificate requirement (your account is in “Immediate access” mode)
+For Residential proxies you must either:
+
+Install our SSL certificate, or
+Disable SSL verification in your tool.
+Docs: Residential network access policy and SSL certificate.
+
+3. Firewall / network blocking port 33335
+Your environment must allow outbound traffic to:
+
+Host: brd.superproxy.io
+Port: 33335
+
+4. Using IP instead of hostname
+You must use the hostname brd.superproxy.io, not a raw IP.

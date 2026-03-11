@@ -6,6 +6,9 @@ Reads config.yaml from the project root and provides defaults.
 import os
 import yaml
 import logging
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -17,24 +20,21 @@ _CONFIG_PATH = os.path.join(_PROJECT_ROOT, "config.yaml")
 _DEFAULTS = {
     "paths": {
         "database": "data/siroco_registry.db",
-        "temp_cache": "data/temp_cache",
         "log_file": "logs/process.log",
         "auth_config": "setup/headers_auth.cfg",
     },
     "playlist": {
         "default_id": "PLXlz4-GmC7VsuHrQgBg40CHHqFftdVNqJ",
     },
-    "proxy": {
-        "batch_size": 5,
-        "batch_delay_min": 2,
-        "batch_delay_max": 5,
+    "batch": {
+        "size": 50,
+        "delay_seconds": 2,
         "max_retries": 3,
+        "max_tracks_to_process": 500,
     },
-    "downloader": {
-        "format": "bestaudio[abr<=64]/worst",
-    },
-    "analyzer": {
-        "sample_rate": 22050,
+    "spotify": {
+        "timeout_seconds": 15,
+        "max_retries": 5,
     },
 }
 

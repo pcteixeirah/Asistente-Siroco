@@ -1,32 +1,25 @@
 # ============================================
-# SIROCO - Configuración Central del Proxy
+# SIROCO - Configuración (Spotify API Pivot)
 # ============================================
 
 paths:
   database: "data/siroco_registry.db"
-  temp_cache: "data/temp_cache"
   log_file: "logs/process.log"
   auth_config: "setup/headers_auth.cfg"
-  cookies: "setup/cookies.txt"
 
 playlist:
   default_id: "PLXlz4-GmC7VsuHrQgBg40CHHqFftdVNqJ"
 
-proxy:
-  batch_size: 5
-  batch_delay_min: 2
-  batch_delay_max: 5
+# Configuración general de procesamiento
+batch:
+  size: 50
+  delay_seconds: 2
+  max_retries: 3
+  max_tracks_to_process: 500
+
+# Parámetros de la API
+spotify:
+  # Las credenciales reales deben ir en el archivo .env
+  # SPOTIFY_CLIENT_ID y SPOTIFY_CLIENT_SECRET
+  timeout_seconds: 15
   max_retries: 5
-  max_tracks_to_process: 10
-
-downloader:
-  format: "bestaudio[abr<=64]/worst"
-
-analyzer:
-  sample_rate: 22050
-
-# --- Proxy & Auth ---
-proxy_rotation:
-  mode: "gateway" # "gateway" | "none"
-  # Replace with actual BrightData/DataImpulse URL
-  gateway_url: "http://brd-customer-hl_6af14608-zone-proxy_rotation_siroco:i9rdba7vt9j2@brd.superproxy.io:33335" 

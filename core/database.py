@@ -32,7 +32,10 @@ class SirocoRegistry:
                     tags TEXT,
                     bpm INTEGER,
                     key TEXT,
-                    energy_rms INTEGER,
+                    energy_rms REAL,
+                    danceability REAL,
+                    valence REAL,
+                    spotify_id TEXT,
                     duration REAL,
                     last_analyzed TIMESTAMP,
                     status TEXT DEFAULT 'pending',
@@ -48,6 +51,9 @@ class SirocoRegistry:
         migrations = [
             ("error_type", "TEXT"),
             ("retry_count", "INTEGER DEFAULT 0"),
+            ("danceability", "REAL"),
+            ("valence", "REAL"),
+            ("spotify_id", "TEXT"),
         ]
         try:
             with self._get_connection() as conn:
@@ -147,9 +153,9 @@ class SirocoRegistry:
             logger.error(f"Error adding track metadata {yt_id}: {e}")
             return False
 
-    def update_analysis(self, yt_id, bpm, key, energy, duration):
+    def update_analysis(self, yt_id, bpm, key, energy, duration, danceability=None, valence=None, spotify_id=None):
         """
-        Update with analysis results. Status -> success. Resets error fields.
+        Update with analysis results from Spotify Web API. Status -> success. Resets error fields.
         """
         try:
             with self._get_connection() as conn:
@@ -157,10 +163,11 @@ class SirocoRegistry:
                 cursor.execute("""
                     UPDATE tracks 
                     SET bpm = ?, key = ?, energy_rms = ?, duration = ?, 
+                        danceability = ?, valence = ?, spotify_id = ?,
                         status = 'success', last_analyzed = ?,
                         error_type = NULL, retry_count = 0
                     WHERE yt_id = ?
-                """, (bpm, key, energy, duration, datetime.now(), yt_id))
+                """, (bpm, key, energy, duration, danceability, valence, spotify_id, datetime.now(), yt_id))
                 conn.commit()
             return True
         except Exception as e:

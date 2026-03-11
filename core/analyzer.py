@@ -1,87 +1,140 @@
-import librosa
-import numpy as np
 import os
 import logging
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
+import time
 
 logger = logging.getLogger(__name__)
 
-# Constants
-MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
-MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
-NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+# Standard pitch class to Key Name mapping (0 = C, 1 = C#, 2 = D, etc.)
+PITCH_CLASS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+MODE_CLASS = ['min', 'maj']
 
 class AudioAnalyzer:
-    def __init__(self, sample_rate=22050):
-        self.sample_rate = sample_rate
-    def _estimate_key(self, y, sr):
+    """
+    Analyzes audio features using the Spotify Web API.
+    Replaces the local librosa processing.
+    """
+    def __init__(self, config=None):
         """
-        Estimates Key using Krumhansl-Schmuckler algorithm (simplified).
+        Initializes the Spotipy client using credentials from environment variables.
+        Requires SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET.
+        """
+        if config is None:
+            config = {}
+            
+        self.timeout = config.get("timeout_seconds", 15)
+        self.max_retries = config.get("max_retries", 5)
+
+        client_id = os.getenv("SPOTIFY_CLIENT_ID")
+        client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
+
+        if not client_id or not client_secret or client_id == "tu_client_id_aqui":
+            logger.error("Spotify credentials not found or not configured in .env")
+            raise ValueError("SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET must be set.")
+
+        # spotipy auth_manager handles token fetching and refreshing automatically
+        auth_manager = SpotifyClientCredentials(
+            client_id=client_id, 
+            client_secret=client_secret
+        )
+        self.sp = spotipy.Spotify(
+            auth_manager=auth_manager,
+            requests_timeout=self.timeout,
+            retries=self.max_retries,
+            status_forcelist=(429, 500, 502, 503, 504) # Retry on rate limits and server errors
+        )
+        logger.info("Spotify API Client Initialized.")
+
+    def search_track(self, query: str) -> str:
+        """
+        Searches for a track on Spotify and returns its Spotify ID.
         """
         try:
-            chroma = librosa.feature.chroma_cens(y=y, sr=sr)
-            chroma_mean = np.mean(chroma, axis=1)
+            results = self.sp.search(q=query, type='track', limit=1)
+            tracks = results.get('tracks', {}).get('items', [])
             
-            maj_corrs = []
-            min_corrs = []
-            
-            for i in range(12):
-                profile_maj = np.roll(MAJOR_PROFILE, i)
-                profile_min = np.roll(MINOR_PROFILE, i)
-                maj_corrs.append(np.corrcoef(chroma_mean, profile_maj)[0, 1])
-                min_corrs.append(np.corrcoef(chroma_mean, profile_min)[0, 1])
+            if not tracks:
+                logger.warning(f"No match found on Spotify for query: '{query}'")
+                return None
                 
-            best_maj_idx = np.argmax(maj_corrs)
-            best_min_idx = np.argmax(min_corrs)
+            track = tracks[0]
+            spotify_id = track.get('id')
+            spotify_name = track.get('name')
             
-            if maj_corrs[best_maj_idx] > min_corrs[best_min_idx]:
-                return f"{NOTE_NAMES[best_maj_idx]} maj"
-            else:
-                return f"{NOTE_NAMES[best_min_idx]} min"
+            # Extract artists for logging
+            artists = ", ".join([a.get('name') for a in track.get('artists', [])])
+            logger.debug(f"Search '{query}' -> Found: '{spotify_name}' by {artists} (ID: {spotify_id})")
+            
+            return spotify_id
+            
+        except spotipy.exceptions.SpotifyException as e:
+            logger.error(f"Spotify API Search Error for '{query}': {e}")
+            raise
         except Exception as e:
-            logger.warning(f"Key estimation failed: {e}")
-            return None
+            logger.error(f"Unknown error during track search '{query}': {e}")
+            raise
 
-    def analyze_track(self, filepath):
+    def get_audio_features(self, spotify_id: str) -> dict:
         """
-        Analyzes audio file for BPM, Key, Energy, Duration.
-        Deletes the file after analysis.
+        Fetches audio features for a specific Spotify ID.
+        Formats the results to match SIROCO's database schema.
         """
         try:
-            # Load with low SR and Mono
-            y, sr = librosa.load(filepath, sr=self.sample_rate, mono=True)
+            features_list = self.sp.audio_features([spotify_id])
             
-            # BPM
-            tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-            bpm = int(round(tempo)) if isinstance(tempo, float) else int(round(tempo[0]))
+            if not features_list or not features_list[0]:
+                logger.warning(f"No audio features available for Spotify ID: {spotify_id}")
+                return None
+                
+            f = features_list[0]
             
-            # Key
-            key = self._estimate_key(y, sr)
-            
-            # Energy (RMS)
-            rms = librosa.feature.rms(y=y)
-            rms_mean = np.mean(rms)
-            energy_score = int(min(max(rms_mean * 100, 1), 10))
-            
-            # Duration
-            duration = librosa.get_duration(y=y, sr=sr)
-            
-            results = {
-                "bpm": bpm,
-                "key": key,
-                "energy_rms": energy_score,
-                "duration": round(duration, 2)
-            }
-            
-            return results
+            # Format Key (0-11) and Mode (0=minor, 1=major) -> e.g., 'C maj', 'A min'
+            key_val = f.get('key', -1)
+            mode_val = f.get('mode', -1)
+            formatted_key = "Unknown"
+            if 0 <= key_val <= 11 and mode_val in [0, 1]:
+                formatted_key = f"{PITCH_CLASS[key_val]} {MODE_CLASS[mode_val]}"
 
+            # Convert duration_ms to seconds
+            duration_s = round(f.get('duration_ms', 0) / 1000.0, 2)
+
+            results = {
+                "bpm": int(round(f.get('tempo', 0))), # Keep BPM as int for DB schema compatibility
+                "key": formatted_key,
+                "energy_rms": f.get('energy', 0.0), # Spotify returns 0.0 to 1.0 float
+                "duration": duration_s,
+                "danceability": f.get('danceability', 0.0),
+                "valence": f.get('valence', 0.0),
+                "spotify_id": spotify_id
+            }
+            return results
+            
         except Exception as e:
-            logger.error(f"Analysis failed for {filepath}: {e}")
+            logger.error(f"Failed to fetch features for ID {spotify_id}: {e}")
             raise
-        finally:
-            # Cleanup
-            if os.path.exists(filepath):
-                try:
-                    os.remove(filepath)
-                    logger.info(f"Deleted temp file: {filepath}")
-                except Exception as cleanup_error:
-                    logger.warning(f"Failed to delete temp file {filepath}: {cleanup_error}")
+
+    def analyze_track(self, title: str, artist: str = "") -> dict:
+        """
+        High-level method that combines search and feature extraction.
+        Takes a track title (and optionally artist) from YT, finds it on Spotify,
+        and returns the audio features.
+        """
+        # Clean query: e.g. remove "(Official Video)", "[Audio]" etc.
+        query = title
+        if artist:
+            query = f"{title} artist:{artist}"
+            
+        logger.info(f"  -> Searching Spotify for: '{query}'")
+        spotify_id = self.search_track(query)
+        
+        if not spotify_id:
+            raise ValueError(f"Track not found on Spotify")
+            
+        logger.info(f"  -> Fetching Audio Features...")
+        features = self.get_audio_features(spotify_id)
+        
+        if not features:
+            raise ValueError(f"Features not available for track")
+            
+        return features
