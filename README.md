@@ -2,6 +2,9 @@
 
 This project acts as an automated pipeline for scanning, downloading, analyzing, and structuring YouTube Music libraries. This document outlines the core architecture and how data flows through the system.
 
+### Acknowledgements
+BPM and song key data used in this application is provided by the [GetSongBPM.com](https://getsongbpm.com) API.
+
 ## Project Structure & Architecture
 
 The workspace is organized into a modular pipeline, separating configuration, core logic, data storage, and environment setup.
