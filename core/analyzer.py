@@ -1,140 +1,186 @@
 import os
+import re
 import logging
-import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials
+import requests
 import time
+from difflib import SequenceMatcher
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Standard pitch class to Key Name mapping (0 = C, 1 = C#, 2 = D, etc.)
-PITCH_CLASS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-MODE_CLASS = ['min', 'maj']
+# Regex to clean YouTube-style suffixes from titles
+_CLEAN_RE = re.compile(
+    r"\s*[\(\[\{]?\s*("
+    r"official\s*(music\s*)?video|"
+    r"official\s*audio|"
+    r"lyric\s*video|"
+    r"audio\s*oficial|"
+    r"video\s*oficial|"
+    r"lyrics?|"
+    r"hd|hq|4k|remaster(ed)?|"
+    r"extended\s*(mix|version)?|"
+    r"original\s*mix|"
+    r"ft\.?\s*.+|"
+    r"feat\.?\s*.+"
+    r")\s*[\)\]\}]?\s*$",
+    re.IGNORECASE
+)
+
 
 class AudioAnalyzer:
     """
-    Analyzes audio features using the Spotify Web API.
-    Replaces the local librosa processing.
+    Analyzes audio features using the GetSongBPM REST API.
+    Searches by title+artist, validates match quality, and extracts
+    BPM, Key, Danceability from inline search results.
     """
+
     def __init__(self, config=None):
-        """
-        Initializes the Spotipy client using credentials from environment variables.
-        Requires SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET.
-        """
         if config is None:
             config = {}
-            
-        self.timeout = config.get("timeout_seconds", 15)
-        self.max_retries = config.get("max_retries", 5)
 
-        client_id = os.getenv("SPOTIFY_CLIENT_ID")
-        client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
+        self.api_key = os.getenv("GETSONGBPM_API_KEY")
+        if not self.api_key or self.api_key == "your_api_key_here":
+            raise ValueError("GETSONGBPM_API_KEY must be set in .env")
 
-        if not client_id or not client_secret or client_id == "tu_client_id_aqui":
-            logger.error("Spotify credentials not found or not configured in .env")
-            raise ValueError("SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET must be set.")
+        self.base_url = config.get("base_url", "https://api.getsong.co")
+        self.match_threshold = config.get("match_threshold", 0.65)
+        self.rate_limit_rpm = config.get("rate_limit_rpm", 50)
+        self._min_interval = 60.0 / self.rate_limit_rpm
+        self._last_request_time = 0
 
-        # spotipy auth_manager handles token fetching and refreshing automatically
-        auth_manager = SpotifyClientCredentials(
-            client_id=client_id, 
-            client_secret=client_secret
-        )
-        self.sp = spotipy.Spotify(
-            auth_manager=auth_manager,
-            requests_timeout=self.timeout,
-            retries=self.max_retries,
-            status_forcelist=(429, 500, 502, 503, 504) # Retry on rate limits and server errors
-        )
-        logger.info("Spotify API Client Initialized.")
+        logger.info(f"GetSongBPM Analyzer initialized (threshold={self.match_threshold})")
 
-    def search_track(self, query: str) -> str:
-        """
-        Searches for a track on Spotify and returns its Spotify ID.
-        """
+    # ── Rate Limiter ──────────────────────────
+    def _throttle(self):
+        elapsed = time.time() - self._last_request_time
+        if elapsed < self._min_interval:
+            time.sleep(self._min_interval - elapsed)
+        self._last_request_time = time.time()
+
+    # ── Query Cleaning ────────────────────────
+    @staticmethod
+    def _clean_title(title: str) -> str:
+        """Remove YouTube-style suffixes like (Official Video), [Lyrics], etc."""
+        cleaned = _CLEAN_RE.sub("", title).strip()
+        cleaned = re.sub(r"\s*-\s*$", "", cleaned)
+        return cleaned if cleaned else title
+
+    # ── API Call ──────────────────────────────
+    def _search_api(self, query: str) -> list:
+        """Call GetSongBPM search endpoint. Returns list of song results."""
+        self._throttle()
+        url = f"{self.base_url}/search/"
+        params = {
+            "api_key": self.api_key,
+            "type": "song",
+            "lookup": query,
+        }
         try:
-            results = self.sp.search(q=query, type='track', limit=1)
-            tracks = results.get('tracks', {}).get('items', [])
-            
-            if not tracks:
-                logger.warning(f"No match found on Spotify for query: '{query}'")
-                return None
-                
-            track = tracks[0]
-            spotify_id = track.get('id')
-            spotify_name = track.get('name')
-            
-            # Extract artists for logging
-            artists = ", ".join([a.get('name') for a in track.get('artists', [])])
-            logger.debug(f"Search '{query}' -> Found: '{spotify_name}' by {artists} (ID: {spotify_id})")
-            
-            return spotify_id
-            
-        except spotipy.exceptions.SpotifyException as e:
-            logger.error(f"Spotify API Search Error for '{query}': {e}")
+            resp = requests.get(url, params=params, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            search_results = data.get("search", [])
+            # API may return a string (e.g. error message) instead of list
+            if not isinstance(search_results, list):
+                return []
+            # Filter out non-dict items
+            return [r for r in search_results if isinstance(r, dict)]
+        except requests.exceptions.HTTPError as e:
+            if resp.status_code == 429:
+                logger.warning("GetSongBPM rate limit hit (429). Backing off 60s.")
+                time.sleep(60)
+                return self._search_api(query)
             raise
         except Exception as e:
-            logger.error(f"Unknown error during track search '{query}': {e}")
+            logger.error(f"GetSongBPM API error: {e}")
             raise
 
-    def get_audio_features(self, spotify_id: str) -> dict:
-        """
-        Fetches audio features for a specific Spotify ID.
-        Formats the results to match SIROCO's database schema.
-        """
-        try:
-            features_list = self.sp.audio_features([spotify_id])
-            
-            if not features_list or not features_list[0]:
-                logger.warning(f"No audio features available for Spotify ID: {spotify_id}")
-                return None
-                
-            f = features_list[0]
-            
-            # Format Key (0-11) and Mode (0=minor, 1=major) -> e.g., 'C maj', 'A min'
-            key_val = f.get('key', -1)
-            mode_val = f.get('mode', -1)
-            formatted_key = "Unknown"
-            if 0 <= key_val <= 11 and mode_val in [0, 1]:
-                formatted_key = f"{PITCH_CLASS[key_val]} {MODE_CLASS[mode_val]}"
+    # ── Match Scoring ─────────────────────────
+    def _score_match(self, query: str, result: dict) -> float:
+        """Calculate string similarity between query and API result title+artist."""
+        result_title = result.get("title", "").lower()
+        # Artist can be a dict with 'name' key or a string
+        artist_data = result.get("artist", "")
+        if isinstance(artist_data, dict):
+            result_artist = artist_data.get("name", "").lower()
+        else:
+            result_artist = str(artist_data).lower()
+        result_str = f"{result_title} {result_artist}".strip()
+        query_lower = query.lower()
+        return SequenceMatcher(None, query_lower, result_str).ratio()
 
-            # Convert duration_ms to seconds
-            duration_s = round(f.get('duration_ms', 0) / 1000.0, 2)
-
-            results = {
-                "bpm": int(round(f.get('tempo', 0))), # Keep BPM as int for DB schema compatibility
-                "key": formatted_key,
-                "energy_rms": f.get('energy', 0.0), # Spotify returns 0.0 to 1.0 float
-                "duration": duration_s,
-                "danceability": f.get('danceability', 0.0),
-                "valence": f.get('valence', 0.0),
-                "spotify_id": spotify_id
-            }
-            return results
-            
-        except Exception as e:
-            logger.error(f"Failed to fetch features for ID {spotify_id}: {e}")
-            raise
-
+    # ── High-Level Orchestrator ───────────────
     def analyze_track(self, title: str, artist: str = "") -> dict:
         """
-        High-level method that combines search and feature extraction.
-        Takes a track title (and optionally artist) from YT, finds it on Spotify,
-        and returns the audio features.
+        Search GetSongBPM for a track, validate match quality,
+        and return BPM + Key + Danceability in a standardized dict.
+
+        The GetSongBPM API returns tempo, key_of, open_key, danceability,
+        and acousticness directly in the search results (no second call needed).
+
+        Raises ValueError if no adequate match is found.
         """
-        # Clean query: e.g. remove "(Official Video)", "[Audio]" etc.
-        query = title
-        if artist:
-            query = f"{title} artist:{artist}"
-            
-        logger.info(f"  -> Searching Spotify for: '{query}'")
-        spotify_id = self.search_track(query)
-        
-        if not spotify_id:
-            raise ValueError(f"Track not found on Spotify")
-            
-        logger.info(f"  -> Fetching Audio Features...")
-        features = self.get_audio_features(spotify_id)
-        
-        if not features:
-            raise ValueError(f"Features not available for track")
-            
-        return features
+        clean_title = self._clean_title(title)
+
+        # Strategy 1: title + artist
+        query = f"{clean_title} {artist}".strip() if artist else clean_title
+        logger.info(f"  -> Searching GetSongBPM: '{query}'")
+        results = self._search_api(query)
+
+        # Strategy 2: fallback to title only if no results with artist
+        if not results and artist:
+            logger.info(f"  -> Fallback search (title only): '{clean_title}'")
+            results = self._search_api(clean_title)
+
+        if not results:
+            raise ValueError(f"No results on GetSongBPM for '{query}'")
+
+        # Score all results and pick best
+        scored = []
+        for r in results:
+            score = self._score_match(query, r)
+            scored.append((score, r))
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        best_score, best_match = scored[0]
+        matched_title = best_match.get("title", "?")
+        artist_data = best_match.get("artist", "")
+        if isinstance(artist_data, dict):
+            matched_artist = artist_data.get("name", "?")
+        else:
+            matched_artist = str(artist_data)
+
+        logger.info(f"  -> Best match: '{matched_title}' by {matched_artist} (score: {best_score:.2f})")
+
+        if best_score < self.match_threshold:
+            raise ValueError(
+                f"Match score {best_score:.2f} below threshold {self.match_threshold} "
+                f"for '{query}' → '{matched_title}' by {matched_artist}"
+            )
+
+        # Extract features directly from search result
+        tempo_str = best_match.get("tempo")
+        key_of = best_match.get("key_of", "Unknown")
+        time_sig = best_match.get("time_sig")
+        danceability_raw = best_match.get("danceability")
+
+        bpm = int(round(float(tempo_str))) if tempo_str else None
+        # Normalize danceability from 0-100 range to 0.0-1.0
+        danceability = round(danceability_raw / 100.0, 3) if danceability_raw is not None else None
+
+        result = {
+            "bpm": bpm,
+            "key": key_of if key_of else "Unknown",
+            "energy_rms": None,
+            "duration": None,
+            "danceability": danceability,
+            "valence": None,
+            "spotify_id": None,
+            "match_score": round(best_score, 3),
+            "time_sig": time_sig,
+            "source": "getsongbpm",
+        }
+
+        return result

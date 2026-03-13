@@ -1,6 +1,6 @@
 """
 SIROCO Error Classifier
-Categorizes yt-dlp and network exceptions into actionable types.
+Categorizes API, network, and scraping exceptions into actionable types.
 """
 
 import re
@@ -11,24 +11,28 @@ logger = logging.getLogger(__name__)
 # Patterns that indicate PERMANENT failures (never retry)
 _PERMANENT_PATTERNS = [
     r"copyright",
-    r"blocked",               # geo-blocked, blocked in your country
+    r"blocked",
     r"video.*(?:unavailable|removed|deleted|private)",
     r"this video is not available",
     r"sign in to confirm your age",
     r"account.*required",
     r"members.only",
-    r"premiere",              # upcoming premiere, not yet available
-    r"join this channel",     # members-only content
-    r"HTTP Error 404",        # Not found
-    r"HTTP Error 410",        # Gone (permanently removed)
+    r"premiere",
+    r"join this channel",
+    r"HTTP Error 404",
+    r"HTTP Error 410",
+    # GetSongBPM specific
+    r"No results on GetSongBPM",
+    r"Match score .+ below threshold",
+    r"Track not found",
 ]
 
 # Patterns that indicate TRANSIENT failures (safe to retry)
 _TRANSIENT_PATTERNS = [
-    r"HTTP Error 403",        # Forbidden (IP ban — rotatable)
-    r"HTTP Error 429",        # Too Many Requests
-    r"HTTP Error 5\d{2}",     # 500, 502, 503, etc.
-    r"timed?\s*out",          # timeout / timed out
+    r"HTTP Error 403",
+    r"HTTP Error 429",
+    r"HTTP Error 5\d{2}",
+    r"timed?\s*out",
     r"connection.*(?:reset|refused|aborted|error)",
     r"network",
     r"temporary",
@@ -37,6 +41,7 @@ _TRANSIENT_PATTERNS = [
     r"ssl",
     r"socket",
     r"too many requests",
+    r"rate limit",
 ]
 
 _permanent_re = re.compile("|".join(_PERMANENT_PATTERNS), re.IGNORECASE)

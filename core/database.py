@@ -54,6 +54,7 @@ class SirocoRegistry:
             ("danceability", "REAL"),
             ("valence", "REAL"),
             ("spotify_id", "TEXT"),
+            ("match_score", "REAL"),
         ]
         try:
             with self._get_connection() as conn:
@@ -153,9 +154,10 @@ class SirocoRegistry:
             logger.error(f"Error adding track metadata {yt_id}: {e}")
             return False
 
-    def update_analysis(self, yt_id, bpm, key, energy, duration, danceability=None, valence=None, spotify_id=None):
+    def update_analysis(self, yt_id, bpm, key, energy=None, duration=None, danceability=None, valence=None, spotify_id=None, match_score=None):
         """
-        Update with analysis results from Spotify Web API. Status -> success. Resets error fields.
+        Update with analysis results. Status -> success. Resets error fields.
+        Accepts partial data (some fields may be None depending on source).
         """
         try:
             with self._get_connection() as conn:
@@ -164,10 +166,11 @@ class SirocoRegistry:
                     UPDATE tracks 
                     SET bpm = ?, key = ?, energy_rms = ?, duration = ?, 
                         danceability = ?, valence = ?, spotify_id = ?,
+                        match_score = ?,
                         status = 'success', last_analyzed = ?,
                         error_type = NULL, retry_count = 0
                     WHERE yt_id = ?
-                """, (bpm, key, energy, duration, danceability, valence, spotify_id, datetime.now(), yt_id))
+                """, (bpm, key, energy, duration, danceability, valence, spotify_id, match_score, datetime.now(), yt_id))
                 conn.commit()
             return True
         except Exception as e:

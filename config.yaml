@@ -1,5 +1,5 @@
 # ============================================
-# SIROCO - Configuración (Spotify API Pivot)
+# SIROCO - Configuración (GetSongBPM API)
 # ============================================
 
 paths:
@@ -15,11 +15,11 @@ batch:
   size: 50
   delay_seconds: 2
   max_retries: 3
-  max_tracks_to_process: 500
+  max_tracks_to_process: 0  # 0 = sin límite
 
-# Parámetros de la API
-spotify:
-  # Las credenciales reales deben ir en el archivo .env
-  # SPOTIFY_CLIENT_ID y SPOTIFY_CLIENT_SECRET
-  timeout_seconds: 15
-  max_retries: 5
+# GetSongBPM API
+getsongbpm:
+  base_url: "https://api.getsong.co"
+  # API key se carga desde .env (GETSONGBPM_API_KEY)
+  match_threshold: 0.65   # Umbral mínimo de similitud para aceptar un match
+  rate_limit_rpm: 50      # Requests por minuto (conservador)

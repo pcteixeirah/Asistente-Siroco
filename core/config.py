@@ -32,9 +32,10 @@ _DEFAULTS = {
         "max_retries": 3,
         "max_tracks_to_process": 500,
     },
-    "spotify": {
-        "timeout_seconds": 15,
-        "max_retries": 5,
+    "getsongbpm": {
+        "base_url": "https://api.getsong.co",
+        "match_threshold": 0.65,
+        "rate_limit_rpm": 50,
     },
 }
 
