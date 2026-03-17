@@ -55,6 +55,11 @@ class SirocoRegistry:
             ("valence", "REAL"),
             ("spotify_id", "TEXT"),
             ("match_score", "REAL"),
+            ("genre", "TEXT"),
+            ("mood", "TEXT"),
+            ("demographic", "TEXT"),
+            ("energy_level", "TEXT"),
+            ("time_of_day", "TEXT"),
         ]
         try:
             with self._get_connection() as conn:
@@ -205,3 +210,67 @@ class SirocoRegistry:
                 conn.commit()
         except Exception as e:
             logger.error(f"Error updating file metadata for {yt_id}: {e}")
+
+    def update_tags(self, yt_id, genre, mood, demographic, energy_level, time_of_day):
+        """
+        Update semantic tags for a track. Values are JSON-serialized lists.
+        """
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE tracks 
+                    SET genre = ?, mood = ?, demographic = ?, 
+                        energy_level = ?, time_of_day = ?
+                    WHERE yt_id = ?
+                """, (
+                    json.dumps(genre) if isinstance(genre, list) else genre,
+                    json.dumps(mood) if isinstance(mood, list) else mood,
+                    json.dumps(demographic) if isinstance(demographic, list) else demographic,
+                    energy_level,
+                    json.dumps(time_of_day) if isinstance(time_of_day, list) else time_of_day,
+                    yt_id
+                ))
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error updating tags for {yt_id}: {e}")
+            return False
+
+    def get_tracks_for_tagging(self):
+        """
+        Returns tracks with status='success' that haven't been tagged yet.
+        """
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT yt_id, title, artist, bpm, key, danceability
+                    FROM tracks 
+                    WHERE status = 'success' AND (genre IS NULL OR genre = '')
+                """)
+                rows = cursor.fetchall()
+                results = []
+                for row in rows:
+                    artist_str = ""
+                    try:
+                        arts = json.loads(row[2]) if row[2] else []
+                        if arts and isinstance(arts[0], dict):
+                            artist_str = arts[0].get('name', '')
+                        elif arts:
+                            artist_str = str(arts[0])
+                    except (json.JSONDecodeError, IndexError):
+                        artist_str = str(row[2] or "")
+                    
+                    results.append({
+                        "yt_id": row[0],
+                        "title": row[1],
+                        "artist": artist_str,
+                        "bpm": row[3],
+                        "key": row[4],
+                        "danceability": row[5],
+                    })
+                return results
+        except Exception as e:
+            logger.error(f"Error getting tracks for tagging: {e}")
+            return []

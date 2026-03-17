@@ -23,3 +23,9 @@ getsongbpm:
   # API key se carga desde .env (GETSONGBPM_API_KEY)
   match_threshold: 0.65   # Umbral mínimo de similitud para aceptar un match
   rate_limit_rpm: 50      # Requests por minuto (conservador)
+
+# Gemini Tagger (Clasificación semántica)
+tagger:
+  model: "gemini-2.0-flash"
+  batch_size: 10    # Tracks por prompt (1 API call)
+  # API key se carga desde .env (GEMINI_API_KEY)
