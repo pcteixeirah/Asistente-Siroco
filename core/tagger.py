@@ -1,6 +1,6 @@
 """
 SIROCO Semantic Tagger
-Uses Gemini Flash to classify tracks into genre, mood, demographic,
+Uses Groq API (Llama 3) to classify tracks into genre, mood, demographic,
 energy_level and time_of_day tags from title + artist + audio features.
 """
 
@@ -47,7 +47,7 @@ _BATCH_TEMPLATE = """Classify each of these {count} songs. Return a JSON array w
 
 class SirocoTagger:
     """
-    Classifies tracks using Gemini Flash API.
+    Classifies tracks using Groq API.
     Supports single-track and batch classification.
     """
 
@@ -55,60 +55,71 @@ class SirocoTagger:
         if config is None:
             config = {}
 
-        self.api_key = os.getenv("GEMINI_API_KEY")
+        self.api_key = os.getenv("GROQ_API_KEY")
         if not self.api_key:
-            raise ValueError("GEMINI_API_KEY must be set in .env")
+            raise ValueError("GROQ_API_KEY must be set in .env")
 
         self.batch_size = config.get("batch_size", 10)
-        self.model_name = config.get("model", "gemini-2.0-flash")
+        self.model_name = config.get("model", "llama-3.3-70b-versatile")
+        
+        # Groq has strict rate limits (varies by tier, free tier is often 30 RPM)
+        # We'll enforce a base delay between calls
+        self.delay_seconds = 2.5 
 
         # Import and configure
-        from google import genai
-        self._client = genai.Client(api_key=self.api_key)
+        from groq import Groq
+        self._client = Groq(api_key=self.api_key)
 
-        logger.info(f"SirocoTagger initialized (model={self.model_name}, batch={self.batch_size})")
+        logger.info(f"SirocoTagger initialized (Groq, model={self.model_name}, batch={self.batch_size})")
 
-    def _call_gemini(self, prompt: str) -> str:
-        """Send prompt to Gemini and return raw text response."""
+    def _call_groq(self, prompt: str) -> str:
+        """Send prompt to Groq and return raw text response."""
         try:
-            response = self._client.models.generate_content(
+            time.sleep(self.delay_seconds) # Respect rate limits
+            response = self._client.chat.completions.create(
                 model=self.model_name,
-                contents=prompt,
-                config={
-                    "system_instruction": _SYSTEM_PROMPT,
-                    "temperature": 0.1,
-                    "max_output_tokens": 2048,
-                }
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,
+                max_tokens=2048,
+                response_format={"type": "json_object"}
             )
-            return response.text
+            return response.choices[0].message.content
         except Exception as e:
-            logger.error(f"Gemini API error: {e}")
+            logger.error(f"Groq API error: {e}")
             raise
 
     def _parse_response(self, raw: str) -> list:
-        """Parse Gemini response into list of tag dicts."""
-        # Strip markdown code fences if present
+        """Parse JSON response into list of tag dicts."""
         cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            # Remove ```json and trailing ```
-            lines = cleaned.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
-            cleaned = "\n".join(lines)
 
         try:
             parsed = json.loads(cleaned)
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Gemini output: {e}\nRaw: {cleaned[:500]}")
-            raise ValueError(f"Invalid JSON from Gemini: {e}")
+            logger.error(f"Failed to parse Groq output: {e}\nRaw: {cleaned[:500]}")
+            raise ValueError(f"Invalid JSON from Groq: {e}")
 
-        # Normalize: if single dict, wrap in list
+        # If it's a dict containing a single track's tags directly
+        # Example: {"genre": ["pop"], "mood": ["dance"]}
+        if isinstance(parsed, dict) and "genre" in parsed:
+            return [parsed]
+
+        # If it's a dict wrapping an array of results
+        # Example: {"results": [{"genre": ["pop"]}, {"genre": ["rock"]}]}
         if isinstance(parsed, dict):
-            parsed = [parsed]
+            for _, val in parsed.items():
+                if isinstance(val, list):
+                    return val
+            # If no list found, wrap the whole dict in a list as last resort
+            return [parsed]
 
-        if not isinstance(parsed, list):
-            raise ValueError(f"Expected list or dict, got {type(parsed)}")
+        # If it's already a list
+        if isinstance(parsed, list):
+            return parsed
 
-        return parsed
+        raise ValueError(f"Expected list or dict, got {type(parsed)}")
 
     def _validate_tags(self, tags: dict) -> dict:
         """Ensure tag values are valid; fill missing with defaults."""
@@ -149,8 +160,11 @@ class SirocoTagger:
             key=key or "Unknown",
             danceability=danceability or "Unknown",
         )
+        
+        # When using JSON mode, the prompt must explicitly ask for JSON
+        prompt += "\n\nReturn a JSON object."
 
-        raw = self._call_gemini(prompt)
+        raw = self._call_groq(prompt)
         parsed = self._parse_response(raw)
         if not parsed:
             raise ValueError(f"Empty response for '{title}'")
@@ -159,7 +173,6 @@ class SirocoTagger:
     def classify_batch(self, tracks: list) -> list:
         """
         Classify a batch of tracks in a single API call.
-        Each track should be a dict with: title, artist, bpm, key, danceability.
         Returns list of validated tag dicts in the same order.
         """
         track_descriptions = []
@@ -177,13 +190,15 @@ class SirocoTagger:
             count=len(tracks),
             tracks="\n\n".join(track_descriptions)
         )
+        # Force a wrapper object so Groq's JSON mode is happy
+        prompt += '\n\nReturn a JSON object containing a single key "results" which holds the array.'
 
-        raw = self._call_gemini(prompt)
+        raw = self._call_groq(prompt)
         parsed = self._parse_response(raw)
 
         # Validate each result
         results = []
-        for i, tags in enumerate(parsed):
+        for i, tags in enumerate(parsed[:len(tracks)]):
             validated = self._validate_tags(tags)
             results.append(validated)
 

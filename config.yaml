@@ -23,9 +23,18 @@ getsongbpm:
   # API key se carga desde .env (GETSONGBPM_API_KEY)
   match_threshold: 0.65   # Umbral mínimo de similitud para aceptar un match
   rate_limit_rpm: 50      # Requests por minuto (conservador)
-
-# Gemini Tagger (Clasificación semántica)
+# Groq Tagger (Clasificación semántica)
 tagger:
-  model: "gemini-2.0-flash"
+  provider: "groq"
+  model: "llama-3.3-70b-versatile"
   batch_size: 10    # Tracks por prompt (1 API call)
-  # API key se carga desde .env (GEMINI_API_KEY)
+  # API key se carga desde .env (GROQ_API_KEY)
+
+# Playlist Generator (Phase 3c)
+schedule:
+  morning:   "06:00-12:00"
+  afternoon: "12:00-18:00"
+  evening:   "18:00-00:00"
+  night:     "00:00-06:00"
+  target_duration_minutes: 120
+
